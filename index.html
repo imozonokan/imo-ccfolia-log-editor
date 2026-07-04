@@ -69,7 +69,7 @@
         <div>
           <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">一括処理</h2>
           <button id="removeSlashBtn" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs py-2 rounded font-semibold transition shadow-sm">
-            文末の「/」を一括削除
+            文末・セリフ直後の「/」を一括削除
           </button>
         </div>
 
@@ -712,19 +712,24 @@
       document.getElementById('addContent').value = '';
     });
 
-    // 文末の「/」一括削除処理
+    // 「/」一括削除処理
     document.getElementById('removeSlashBtn').addEventListener('click', () => {
       if (logs.length === 0) {
         alert('ログデータが読み込まれていません。');
         return;
       }
 
-      if (confirm('すべての発言の末尾にある「/」または「／」を一括で削除します。よろしいですか？\n※文末の改行や空白スペースはそのまま維持されます。')) {
+      if (confirm('すべての発言において、文末および「」や』などの閉じ括弧直後にある「/」や「／」を一括で削除します。よろしいですか？\n※空白や改行を挟んでいる場合も対象となります。')) {
         let count = 0;
         logs.forEach(log => {
           const original = log.content;
           
-          // 末尾のスラッシュ（半角・全角）を対象に、それより後にある空白文字や改行タグ（<br>など）をキャプチャして保持したまま削除
+          // 1. 閉じ括弧（」や』）の直後にあるスラッシュ（半角・全角）を削除
+          // 例: 「そうだな」/(行動) ➔ 「そうだな」(行動)
+          log.content = log.content.replace(/([」』])[/／]/g, '$1');
+
+          // 2. 発言の最後（文末）にあるスラッシュを削除
+          // 後ろにある空白文字や改行タグ（<br>など）を保持したままスラッシュだけを削る
           log.content = log.content.replace(/[/／](\s*(?:<br\s*\/?>\s*)*)$/i, '$1');
           
           if (original !== log.content) {
@@ -733,7 +738,7 @@
         });
         
         renderLogs();
-        alert(`${count}件の発言から末尾の「/」を削除しました。`);
+        alert(`${count}件の発言から不要な「/」を削除しました。`);
       }
     });
 
