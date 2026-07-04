@@ -403,7 +403,15 @@
           const newName = nameInput.value.trim();
           if (newName && newName !== name) {
             logs.forEach(log => {
-              if (log.name === name) log.name = newName;
+              // 1. 各発言の送信者名を更新
+              if (log.name === name) {
+                log.name = newName;
+              }
+              
+              // 2. 本文（システムログ等）の中に含まれる名前も完全一致で全置換
+              if (log.content.includes(name)) {
+                log.content = log.content.split(name).join(newName);
+              }
             });
             renderLogs();
           }
