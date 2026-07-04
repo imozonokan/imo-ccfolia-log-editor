@@ -84,6 +84,17 @@
         <!-- 新規発言追加 -->
         <div class="border-t border-gray-200 pt-4">
           <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">新規発言の追加</h2>
+          
+          <!-- 挿入位置指定用のインジケーター（挿入モード時のみ表示） -->
+          <div id="insertIndicator" class="hidden bg-blue-50 border border-blue-200 rounded p-2 mb-3 text-xs flex justify-between items-center text-blue-800">
+            <div>
+              <span class="font-bold">挿入位置:</span> <span id="insertTargetLabel"></span> の後ろ
+            </div>
+            <button id="cancelInsertBtn" class="text-red-500 hover:text-red-700 font-bold hover:underline">
+              キャンセル
+            </button>
+          </div>
+
           <div class="space-y-2">
             <div>
               <label class="text-xs text-gray-500 font-semibold">発言者名</label>
@@ -179,6 +190,7 @@
     let logs = []; 
     let activeTabs = new Set(['main', 'sub', 'other', 'info', 'system']); 
     let currentEditIndex = null;
+    let insertTargetIndex = null; // 挿入位置を管理するグローバル変数
 
     // DOM要素取得
     const fileInput = document.getElementById('fileInput');
@@ -193,6 +205,10 @@
     // 新規追加エリア用
     const addTextColor = document.getElementById('addTextColor');
     const addPaletteGrid = document.getElementById('addPaletteGrid');
+    const addLogBtn = document.getElementById('addLogBtn');
+    const insertIndicator = document.getElementById('insertIndicator');
+    const insertTargetLabel = document.getElementById('insertTargetLabel');
+    const cancelInsertBtn = document.getElementById('cancelInsertBtn');
 
     // モーダル用
     const colorModal = document.getElementById('colorModal');
@@ -265,6 +281,9 @@
           newLogs.push(logs[index]);
         });
         logs = newLogs;
+        
+        // 並び替え完了時、挿入選択位置がズレるのを防ぐため一度リセット
+        cancelInsertMode();
         renderLogs(); 
       }
     });
@@ -473,8 +492,15 @@
       logs.forEach((log, index) => {
         if (!activeTabs.has(log.tab)) return;
 
+        const isCurrentlySelected = (insertTargetIndex === index);
+
         const p = document.createElement('div');
-        p.className = 'flex items-start bg-white border border-gray-200 rounded p-2.5 shadow-sm space-x-2 relative group hover:border-indigo-300 transition duration-150';
+        // 挿入ターゲットに選ばれている発言は青いハイライト枠を表示
+        p.className = `flex items-start bg-white border rounded p-2.5 shadow-sm space-x-2 relative group transition duration-150 ${
+          isCurrentlySelected 
+            ? 'border-blue-500 ring-2 ring-blue-100 bg-blue-50/10' 
+            : 'border-gray-200 hover:border-indigo-300'
+        }`;
         p.dataset.index = index;
 
         const handle = document.createElement('div');
@@ -512,6 +538,19 @@
         const controlPanel = document.createElement('div');
         controlPanel.className = 'flex items-center space-x-1 shrink-0 self-center opacity-0 group-hover:opacity-100 transition duration-150';
 
+        // 挿入追加モードにする「＋」ボタン
+        const insertBtn = document.createElement('button');
+        insertBtn.className = 'p-1 hover:bg-blue-50 rounded text-blue-600 transition';
+        insertBtn.title = 'この発言の直後に新規発言を挿入';
+        insertBtn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+        `;
+        insertBtn.addEventListener('click', () => {
+          setInsertTarget(index, log.name);
+        });
+
         const editBtn = document.createElement('button');
         editBtn.className = 'p-1 hover:bg-gray-100 rounded text-indigo-600 transition';
         editBtn.innerHTML = `
@@ -533,10 +572,12 @@
         deleteBtn.addEventListener('click', () => {
           if (confirm('この発言を削除しますか？')) {
             logs.splice(index, 1);
+            cancelInsertMode();
             renderLogs();
           }
         });
 
+        controlPanel.appendChild(insertBtn);
         controlPanel.appendChild(editBtn);
         controlPanel.appendChild(deleteBtn);
 
@@ -550,6 +591,34 @@
 
       renderCharList();
     }
+
+    // 挿入モードをセット
+    function setInsertTarget(index, charName) {
+      insertTargetIndex = index;
+      insertTargetLabel.textContent = `No.${index + 1} [${charName}]`;
+      insertIndicator.classList.remove('hidden');
+      addLogBtn.textContent = '指定位置に発言を挿入する';
+      addLogBtn.className = 'w-full bg-blue-600 hover:bg-blue-500 text-white text-xs py-2 rounded font-semibold transition';
+      
+      renderLogs(); // 該当のログ枠を青くハイライト
+      
+      // 入力欄に意識を促すためスクロール＆フォーカス
+      document.getElementById('addName').focus();
+    }
+
+    // 挿入モードをキャンセル
+    function cancelInsertMode() {
+      insertTargetIndex = null;
+      insertIndicator.classList.add('hidden');
+      addLogBtn.textContent = '末尾に発言を追加する';
+      addLogBtn.className = 'w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2 rounded font-semibold transition';
+    }
+
+    cancelInsertBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      cancelInsertMode();
+      renderLogs();
+    });
 
     // 編集モード
     function enterEditMode(pElement, index, log, bodyTextElement) {
@@ -594,7 +663,7 @@
     }
 
     // 発言追加処理
-    document.getElementById('addLogBtn').addEventListener('click', () => {
+    addLogBtn.addEventListener('click', () => {
       const name = document.getElementById('addName').value.trim();
       const tab = document.getElementById('addTab').value;
       let color = addTextColor.value.trim();
@@ -618,16 +687,29 @@
 
       const content = contentRaw.replace(/\n/g, '<br>');
 
-      logs.push({
+      const newLog = {
         color: color.toLowerCase(),
         tab: tab,
         name: name,
         content: content
-      });
+      };
+
+      if (insertTargetIndex !== null) {
+        // 選択されたインデックスの「直後」に要素を挿入
+        logs.splice(insertTargetIndex + 1, 0, newLog);
+        
+        // 挿入完了後、挿入した新しい位置を選択状態にしておく（連続挿入しやすいように）
+        const nextInsertIndex = insertTargetIndex + 1;
+        cancelInsertMode();
+        setInsertTarget(nextInsertIndex, name);
+      } else {
+        // 通常は末尾に追加
+        logs.push(newLog);
+        renderLogs();
+        editorContainer.scrollTop = editorContainer.scrollHeight;
+      }
 
       document.getElementById('addContent').value = '';
-      renderLogs();
-      editorContainer.scrollTop = editorContainer.scrollHeight;
     });
 
     // 文末の「/」一括削除処理
