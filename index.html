@@ -1,5 +1,3 @@
---- START OF FILE text/html ---
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -487,6 +485,9 @@
 
     // ログリスト描画
     function renderLogs() {
+      // 描画更新時（操作による中断・編集エリア消失時など）に、編集中状態を確実に初期化します
+      currentEditIndex = null;
+
       logList.innerHTML = '';
 
       logs.forEach((log, index) => {
