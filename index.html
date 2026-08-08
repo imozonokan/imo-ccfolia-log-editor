@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ココフォリア・ログ整形エディター</title>
+  <title>ココフォリア・そのままログ整形えでぃたー</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- SortableJS CDN (ドラッグ＆ドロップ用) -->
@@ -38,7 +38,7 @@
 
   <!-- ヘッダー -->
   <header class="bg-indigo-900 text-white p-4 shadow-md flex justify-between items-center shrink-0">
-    <h1 class="text-xl font-bold">ココフォリア・ログ整形エディター</h1>
+    <h1 class="text-xl font-bold">ココフォリア・そのままログ整形えでぃたー</h1>
     <div class="flex items-center space-x-3">
       <label class="bg-indigo-700 hover:bg-indigo-600 px-4 py-2 rounded cursor-pointer transition text-sm">
         ログファイルを読み込む
@@ -189,6 +189,7 @@
     let activeTabs = new Set(['main', 'sub', 'other', 'info', 'system']); 
     let currentEditIndex = null;
     let insertTargetIndex = null; // 挿入位置を管理するグローバル変数
+    let loadedFileName = ''; // 読み込んだファイル名を保持する変数
 
     // DOM要素取得
     const fileInput = document.getElementById('fileInput');
@@ -294,6 +295,7 @@
       if (e.dataTransfer.files.length > 0) {
         const file = e.dataTransfer.files[0];
         if (file.name.endsWith('.html')) {
+          loadedFileName = file.name;
           const reader = new FileReader();
           reader.onload = function(evt) {
             parseAndLoadHTML(evt.target.result);
@@ -306,6 +308,7 @@
     function handleFileSelect(e) {
       const file = e.target.files[0];
       if (!file) return;
+      loadedFileName = file.name;
       const reader = new FileReader();
       reader.onload = function(evt) {
         parseAndLoadHTML(evt.target.result);
@@ -770,11 +773,18 @@
   </body>
 </html>`;
 
+      // 保存用ファイル名の生成処理（読み込んだファイル名から拡張子を取り除いて _整形.html を付与）
+      let exportFileName = 'edited_ccfolia_log.html';
+      if (loadedFileName) {
+        const baseName = loadedFileName.replace(/\.[^/.]+$/, "");
+        exportFileName = `${baseName}_整形.html`;
+      }
+
       const blob = new Blob([finalHTML], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'edited_ccfolia_log.html';
+      a.download = exportFileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
