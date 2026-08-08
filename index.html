@@ -63,9 +63,40 @@
           </div>
         </div>
 
-        <!-- 一括処理 -->
-        <div>
-          <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">一括処理</h2>
+        <!-- 一括処理・選択操作 -->
+        <div class="space-y-3">
+          <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">一括処理・複数操作</h2>
+          
+          <!-- 集中削除モードスイッチ -->
+          <div class="bg-red-50 border border-red-200 p-2.5 rounded-md">
+            <label class="flex items-center justify-between cursor-pointer">
+              <span class="text-xs font-bold text-red-800">集中削除モード</span>
+              <input type="checkbox" id="fastDeleteToggle" class="sr-only peer">
+              <div class="relative w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+            </label>
+            <p class="text-[10px] text-red-600 mt-1 leading-tight">ONにすると削除時の確認ダイアログをスキップして即削除します。</p>
+          </div>
+
+          <!-- 選択操作エリア -->
+          <div class="bg-gray-50 p-2.5 rounded border border-gray-200 space-y-2">
+            <div class="flex justify-between items-center text-xs text-gray-600 font-semibold">
+              <span>選択中の発言:</span>
+              <span id="selectedCountLabel" class="text-indigo-600 font-bold">0 件</span>
+            </div>
+            <div class="flex space-x-1.5">
+              <button id="selectAllBtn" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs py-1.5 rounded font-semibold transition">
+                表示中を全選択
+              </button>
+              <button id="deselectAllBtn" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs py-1.5 rounded font-semibold transition">
+                選択解除
+              </button>
+            </div>
+            <button id="deleteSelectedBtn" class="w-full bg-red-600 hover:bg-red-500 disabled:bg-gray-300 text-white text-xs py-1.5 rounded font-semibold transition shadow-sm" disabled>
+              選択した発言を一括削除
+            </button>
+          </div>
+
+          <!-- 成形処理 -->
           <button id="removeSlashBtn" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs py-2 rounded font-semibold transition shadow-sm">
             文末・セリフ直後の「/」を一括削除
           </button>
@@ -190,6 +221,7 @@
     let currentEditIndex = null;
     let insertTargetIndex = null; // 挿入位置を管理するグローバル変数
     let loadedFileName = ''; // 読み込んだファイル名を保持する変数
+    let fastDeleteMode = false; // 集中削除モードフラグ
 
     // DOM要素取得
     const fileInput = document.getElementById('fileInput');
@@ -200,6 +232,13 @@
     const logList = document.getElementById('logList');
     const tabFilters = document.getElementById('tabFilters');
     const charList = document.getElementById('charList');
+
+    // 複数操作・集中削除用DOM
+    const fastDeleteToggle = document.getElementById('fastDeleteToggle');
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    const selectedCountLabel = document.getElementById('selectedCountLabel');
 
     // 新規追加エリア用
     const addTextColor = document.getElementById('addTextColor');
@@ -267,6 +306,12 @@
 
     // 起動時にパレットを初期化
     initPaletteGrids();
+
+    // 集中削除モード切り替えイベント
+    fastDeleteToggle.addEventListener('change', (e) => {
+      fastDeleteMode = e.target.checked;
+      renderLogs();
+    });
 
     // D&D並び替え設定
     const sortable = new Sortable(logList, {
@@ -341,7 +386,8 @@
             color: color,
             tab: tab,
             name: name,
-            content: content
+            content: content,
+            selected: false // 選択状態フラグ
           });
         }
       });
@@ -455,6 +501,49 @@
       });
     }
 
+    // 選択状態カウント＆UI更新処理
+    function updateSelectionUI() {
+      const selectedLogs = logs.filter(log => log.selected);
+      const count = selectedLogs.length;
+      selectedCountLabel.textContent = `${count} 件`;
+      
+      if (count > 0) {
+        deleteSelectedBtn.disabled = false;
+      } else {
+        deleteSelectedBtn.disabled = true;
+      }
+    }
+
+    // 全選択ボタン
+    selectAllBtn.addEventListener('click', () => {
+      logs.forEach(log => {
+        if (activeTabs.has(log.tab)) {
+          log.selected = true;
+        }
+      });
+      renderLogs();
+    });
+
+    // 全解除ボタン
+    deselectAllBtn.addEventListener('click', () => {
+      logs.forEach(log => {
+        log.selected = false;
+      });
+      renderLogs();
+    });
+
+    // 選択した発言を一括削除
+    deleteSelectedBtn.addEventListener('click', () => {
+      const selectedCount = logs.filter(l => l.selected).length;
+      if (selectedCount === 0) return;
+
+      if (fastDeleteMode || confirm(`選択された ${selectedCount} 件の発言を一括削除します。よろしいですか？`)) {
+        logs = logs.filter(log => !log.selected);
+        cancelInsertMode();
+        renderLogs();
+      }
+    });
+
     // モーダルの表示処理
     function openColorModal(name, currentColor) {
       activeColorTargetName = name;
@@ -499,16 +588,30 @@
         const isCurrentlySelected = (insertTargetIndex === index);
 
         const p = document.createElement('div');
-        // 挿入ターゲットに選ばれている発言は青いハイライト枠を表示
-        p.className = `flex items-start bg-white border rounded p-2.5 shadow-sm space-x-2 relative group transition duration-150 ${
-          isCurrentlySelected 
-            ? 'border-blue-500 ring-2 ring-blue-100 bg-blue-50/10' 
-            : 'border-gray-200 hover:border-indigo-300'
-        }`;
+        // スタイル設定（選択中は黄色ハイライト、挿入先指定時は青ハイライト）
+        let bgStyle = 'bg-white border-gray-200 hover:border-indigo-300';
+        if (log.selected) {
+          bgStyle = 'bg-amber-50/80 border-amber-300 ring-1 ring-amber-200';
+        } else if (isCurrentlySelected) {
+          bgStyle = 'border-blue-500 ring-2 ring-blue-100 bg-blue-50/10';
+        }
+
+        p.className = `flex items-start border rounded p-2.5 shadow-sm space-x-2 relative group transition duration-150 ${bgStyle}`;
         p.dataset.index = index;
 
+        // 一括選択用チェックボックス
+        const selectCheckbox = document.createElement('input');
+        selectCheckbox.type = 'checkbox';
+        selectCheckbox.checked = !!log.selected;
+        selectCheckbox.className = 'rounded text-amber-600 focus:ring-amber-500 cursor-pointer mt-1 shrink-0';
+        selectCheckbox.addEventListener('change', (e) => {
+          log.selected = e.target.checked;
+          updateSelectionUI();
+          renderLogs();
+        });
+
         const handle = document.createElement('div');
-        handle.className = 'drag-handle text-gray-400 p-1 hover:text-gray-600 transition';
+        handle.className = 'drag-handle text-gray-400 p-1 hover:text-gray-600 transition shrink-0';
         handle.innerHTML = `
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8h16M4 16h16"></path>
@@ -520,7 +623,7 @@
         tabBadge.textContent = `[${log.tab}]`;
 
         const contentBox = document.createElement('div');
-        contentBox.className = 'flex-1 space-y-1';
+        contentBox.className = 'flex-1 space-y-1 min-w-0';
 
         const header = document.createElement('div');
         header.className = 'flex items-center space-x-2';
@@ -557,6 +660,7 @@
 
         const editBtn = document.createElement('button');
         editBtn.className = 'p-1 hover:bg-gray-100 rounded text-indigo-600 transition';
+        editBtn.title = '編集';
         editBtn.innerHTML = `
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
@@ -567,14 +671,22 @@
         });
 
         const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'p-1 hover:bg-red-50 rounded text-red-500 transition';
+        // 集中削除モードON時はボタンを赤く強調表示
+        if (fastDeleteMode) {
+          deleteBtn.className = 'p-1 bg-red-100 hover:bg-red-200 rounded text-red-600 font-bold transition';
+          deleteBtn.title = '【集中削除】確認なしで即削除';
+        } else {
+          deleteBtn.className = 'p-1 hover:bg-red-50 rounded text-red-500 transition';
+          deleteBtn.title = '削除';
+        }
         deleteBtn.innerHTML = `
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
           </svg>
         `;
         deleteBtn.addEventListener('click', () => {
-          if (confirm('この発言を削除しますか？')) {
+          // 集中削除モードON、または通常の確認ポップアップでOKの場合に削除
+          if (fastDeleteMode || confirm('この発言を削除しますか？')) {
             logs.splice(index, 1);
             cancelInsertMode();
             renderLogs();
@@ -585,6 +697,7 @@
         controlPanel.appendChild(editBtn);
         controlPanel.appendChild(deleteBtn);
 
+        p.appendChild(selectCheckbox);
         p.appendChild(handle);
         p.appendChild(tabBadge);
         p.appendChild(contentBox);
@@ -593,6 +706,7 @@
         logList.appendChild(p);
       });
 
+      updateSelectionUI();
       renderCharList();
     }
 
@@ -695,7 +809,8 @@
         color: color.toLowerCase(),
         tab: tab,
         name: name,
-        content: content
+        content: content,
+        selected: false
       };
 
       if (insertTargetIndex !== null) {
