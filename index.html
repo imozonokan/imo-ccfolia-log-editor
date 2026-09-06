@@ -53,8 +53,8 @@
   <!-- メインコンテンツ -->
   <main class="flex-1 flex overflow-hidden">
     <!-- サイドバー (コントロールパネル) -->
-    <aside id="sidebar" class="w-80 bg-white border-r border-gray-200 p-4 flex flex-col justify-between overflow-y-auto hidden shrink-0">
-      <div class="space-y-6">
+    <aside id="sidebar" class="bg-white border-r border-gray-200 p-4 flex flex-col justify-between overflow-y-auto hidden shrink-0" style="width: 22rem;">
+      <div class="space-y-5">
         <!-- タブ表示切り替え -->
         <div>
           <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">タブ表示/出力切り替え</h2>
@@ -63,9 +63,9 @@
           </div>
         </div>
 
-        <!-- 一括処理・選択操作 -->
+        <!-- 一括処理・複数操作 -->
         <div class="space-y-3">
-          <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">一括処理・複数操作</h2>
+          <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">一括処理・成形ツール</h2>
           
           <!-- 集中削除モードスイッチ -->
           <div class="bg-red-50 border border-red-200 p-2.5 rounded-md">
@@ -96,16 +96,58 @@
             </button>
           </div>
 
-          <!-- 成形処理 -->
+          <!-- ダイス判定簡略化 (シークレット完全対応) -->
+          <button id="simplifyDiceBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2 rounded font-semibold transition shadow-sm flex items-center justify-center space-x-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            <span>ダイス成否判定を一括簡略化 (s対応)</span>
+          </button>
+
+          <!-- 成形処理 (スラッシュ削除) -->
           <button id="removeSlashBtn" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs py-2 rounded font-semibold transition shadow-sm">
             文末・セリフ直後の「/」を一括削除
           </button>
+
+          <!-- 文字列一括置換・削除ツール -->
+          <details class="bg-gray-50 border border-gray-200 rounded p-2 text-xs">
+            <summary class="font-bold text-gray-700 cursor-pointer select-none">文字列の一括置換・一括削除</summary>
+            <div class="mt-2 space-y-2 pt-1 border-t border-gray-200">
+              <div>
+                <label class="text-[11px] text-gray-500 font-semibold block">検索する文字列</label>
+                <input type="text" id="replaceSearchInput" class="w-full border rounded px-2 py-1 text-xs" placeholder="置換/削除したい文字列" />
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500 font-semibold block">置換後の文字列 (空欄で一括削除)</label>
+                <input type="text" id="replaceWithInput" class="w-full border rounded px-2 py-1 text-xs" placeholder="空欄の場合は検索文字を削除" />
+              </div>
+              <button id="executeReplaceBtn" class="w-full bg-teal-600 hover:bg-teal-500 text-white text-xs py-1.5 rounded font-semibold transition shadow-sm">
+                文字列を一括置換 / 削除
+              </button>
+            </div>
+          </details>
+
+          <!-- 指定文字列を含む発言の一括削除 -->
+          <details class="bg-gray-50 border border-red-200 rounded p-2 text-xs">
+            <summary class="font-bold text-red-800 cursor-pointer select-none">発言の条件一括削除 (保護機能付)</summary>
+            <div class="mt-2 space-y-2 pt-1 border-t border-red-100">
+              <div>
+                <label class="text-[11px] text-gray-600 font-semibold block">削除対象にする文字列</label>
+                <input type="text" id="filterDeleteInput" class="w-full border rounded px-2 py-1 text-xs" placeholder="例: 失敗❌" />
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-600 font-semibold block">保護する文字列 (これを含めば除外)</label>
+                <input type="text" id="filterProtectInput" class="w-full border rounded px-2 py-1 text-xs" placeholder="例: 「 (セリフは残す等)" />
+              </div>
+              <button id="executeFilterDeleteBtn" class="w-full bg-red-600 hover:bg-red-500 text-white text-xs py-1.5 rounded font-semibold transition shadow-sm">
+                条件に一致する発言を一括削除
+              </button>
+            </div>
+          </details>
         </div>
 
         <!-- キャラクター一括操作 -->
         <div>
           <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">キャラクター一覧と操作</h2>
-          <div id="charList" class="space-y-3 max-h-48 overflow-y-auto pr-1 border border-gray-100 p-2 rounded">
+          <div id="charList" class="space-y-3 max-h-40 overflow-y-auto pr-1 border border-gray-100 p-2 rounded">
             <!-- 動的に生成 -->
           </div>
         </div>
@@ -219,9 +261,9 @@
     let logs = []; 
     let activeTabs = new Set(['main', 'sub', 'other', 'info', 'system']); 
     let currentEditIndex = null;
-    let insertTargetIndex = null; // 挿入位置を管理するグローバル変数
-    let loadedFileName = ''; // 読み込んだファイル名を保持する変数
-    let fastDeleteMode = false; // 集中削除モードフラグ
+    let insertTargetIndex = null; 
+    let loadedFileName = ''; 
+    let fastDeleteMode = false; 
 
     // DOM要素取得
     const fileInput = document.getElementById('fileInput');
@@ -239,6 +281,15 @@
     const deselectAllBtn = document.getElementById('deselectAllBtn');
     const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
     const selectedCountLabel = document.getElementById('selectedCountLabel');
+
+    // 追加機能用DOM
+    const simplifyDiceBtn = document.getElementById('simplifyDiceBtn');
+    const replaceSearchInput = document.getElementById('replaceSearchInput');
+    const replaceWithInput = document.getElementById('replaceWithInput');
+    const executeReplaceBtn = document.getElementById('executeReplaceBtn');
+    const filterDeleteInput = document.getElementById('filterDeleteInput');
+    const filterProtectInput = document.getElementById('filterProtectInput');
+    const executeFilterDeleteBtn = document.getElementById('executeFilterDeleteBtn');
 
     // 新規追加エリア用
     const addTextColor = document.getElementById('addTextColor');
@@ -273,9 +324,8 @@
       return trimmed;
     }
 
-    // カラーグリッドを初期化生成する関数
+    // カラーグリッド初期化
     function initPaletteGrids() {
-      // 1. 新規追加フォーム用のグリッド
       addPaletteGrid.innerHTML = '';
       presetColors.forEach(color => {
         const btn = document.createElement('button');
@@ -289,7 +339,6 @@
         addPaletteGrid.appendChild(btn);
       });
 
-      // 2. モーダル用のグリッド
       modalPaletteGrid.innerHTML = '';
       presetColors.forEach(color => {
         const btn = document.createElement('button');
@@ -304,16 +353,13 @@
       });
     }
 
-    // 起動時にパレットを初期化
     initPaletteGrids();
 
-    // 集中削除モード切り替えイベント
     fastDeleteToggle.addEventListener('change', (e) => {
       fastDeleteMode = e.target.checked;
       renderLogs();
     });
 
-    // D&D並び替え設定
     const sortable = new Sortable(logList, {
       handle: '.drag-handle',
       animation: 150,
@@ -325,8 +371,6 @@
           newLogs.push(logs[index]);
         });
         logs = newLogs;
-        
-        // 並び替え完了時、挿入選択位置がズレるのを防ぐため一度リセット
         cancelInsertMode();
         renderLogs(); 
       }
@@ -361,7 +405,6 @@
       reader.readAsText(file);
     }
 
-    // HTMLのパース処理
     function parseAndLoadHTML(htmlText) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(htmlText, 'text/html');
@@ -371,7 +414,6 @@
       activeTabs = new Set(['main', 'sub', 'other', 'info', 'system']);
 
       paragraphs.forEach(p => {
-        // style.colorから取得した値を rgbToHex で確実に HEX形式に変換する
         const rawColor = p.style.color || '#888888';
         const color = rgbToHex(rawColor);
         
@@ -387,7 +429,7 @@
             tab: tab,
             name: name,
             content: content,
-            selected: false // 選択状態フラグ
+            selected: false
           });
         }
       });
@@ -404,7 +446,6 @@
       }
     }
 
-    // タブフィルターの表示
     function renderTabFilters() {
       const tabSet = new Set();
       logs.forEach(log => tabSet.add(log.tab));
@@ -441,7 +482,6 @@
       });
     }
 
-    // キャラクターリストの表示
     function renderCharList() {
       const charsMap = new Map();
       logs.forEach(log => {
@@ -469,12 +509,9 @@
           const newName = nameInput.value.trim();
           if (newName && newName !== name) {
             logs.forEach(log => {
-              // 1. 各発言の送信者名を更新
               if (log.name === name) {
                 log.name = newName;
               }
-              
-              // 2. 本文（システムログ等）の中に含まれる名前も完全一致で全置換
               if (log.content.includes(name)) {
                 log.content = log.content.split(name).join(newName);
               }
@@ -501,20 +538,13 @@
       });
     }
 
-    // 選択状態カウント＆UI更新処理
     function updateSelectionUI() {
       const selectedLogs = logs.filter(log => log.selected);
       const count = selectedLogs.length;
       selectedCountLabel.textContent = `${count} 件`;
-      
-      if (count > 0) {
-        deleteSelectedBtn.disabled = false;
-      } else {
-        deleteSelectedBtn.disabled = true;
-      }
+      deleteSelectedBtn.disabled = (count === 0);
     }
 
-    // 全選択ボタン
     selectAllBtn.addEventListener('click', () => {
       logs.forEach(log => {
         if (activeTabs.has(log.tab)) {
@@ -524,7 +554,6 @@
       renderLogs();
     });
 
-    // 全解除ボタン
     deselectAllBtn.addEventListener('click', () => {
       logs.forEach(log => {
         log.selected = false;
@@ -532,7 +561,6 @@
       renderLogs();
     });
 
-    // 選択した発言を一括削除
     deleteSelectedBtn.addEventListener('click', () => {
       const selectedCount = logs.filter(l => l.selected).length;
       if (selectedCount === 0) return;
@@ -544,11 +572,10 @@
       }
     });
 
-    // モーダルの表示処理
     function openColorModal(name, currentColor) {
       activeColorTargetName = name;
       modalTargetChar.textContent = name;
-      modalColorText.value = rgbToHex(currentColor); // 確実にHEXに変換して設定
+      modalColorText.value = rgbToHex(currentColor);
       colorModal.classList.remove('hidden');
     }
 
@@ -575,11 +602,8 @@
       }
     });
 
-    // ログリスト描画
     function renderLogs() {
-      // 描画更新時（操作による中断・編集エリア消失時など）に、編集中状態を確実に初期化します
       currentEditIndex = null;
-
       logList.innerHTML = '';
 
       logs.forEach((log, index) => {
@@ -588,7 +612,6 @@
         const isCurrentlySelected = (insertTargetIndex === index);
 
         const p = document.createElement('div');
-        // スタイル設定（選択中は黄色ハイライト、挿入先指定時は青ハイライト）
         let bgStyle = 'bg-white border-gray-200 hover:border-indigo-300';
         if (log.selected) {
           bgStyle = 'bg-amber-50/80 border-amber-300 ring-1 ring-amber-200';
@@ -599,7 +622,6 @@
         p.className = `flex items-start border rounded p-2.5 shadow-sm space-x-2 relative group transition duration-150 ${bgStyle}`;
         p.dataset.index = index;
 
-        // 一括選択用チェックボックス
         const selectCheckbox = document.createElement('input');
         selectCheckbox.type = 'checkbox';
         selectCheckbox.checked = !!log.selected;
@@ -645,7 +667,6 @@
         const controlPanel = document.createElement('div');
         controlPanel.className = 'flex items-center space-x-1 shrink-0 self-center opacity-0 group-hover:opacity-100 transition duration-150';
 
-        // 挿入追加モードにする「＋」ボタン
         const insertBtn = document.createElement('button');
         insertBtn.className = 'p-1 hover:bg-blue-50 rounded text-blue-600 transition';
         insertBtn.title = 'この発言の直後に新規発言を挿入';
@@ -671,7 +692,6 @@
         });
 
         const deleteBtn = document.createElement('button');
-        // 集中削除モードON時はボタンを赤く強調表示
         if (fastDeleteMode) {
           deleteBtn.className = 'p-1 bg-red-100 hover:bg-red-200 rounded text-red-600 font-bold transition';
           deleteBtn.title = '【集中削除】確認なしで即削除';
@@ -685,7 +705,6 @@
           </svg>
         `;
         deleteBtn.addEventListener('click', () => {
-          // 集中削除モードON、または通常の確認ポップアップでOKの場合に削除
           if (fastDeleteMode || confirm('この発言を削除しますか？')) {
             logs.splice(index, 1);
             cancelInsertMode();
@@ -710,7 +729,6 @@
       renderCharList();
     }
 
-    // 挿入モードをセット
     function setInsertTarget(index, charName) {
       insertTargetIndex = index;
       insertTargetLabel.textContent = `No.${index + 1} [${charName}]`;
@@ -718,13 +736,10 @@
       addLogBtn.textContent = '指定位置に発言を挿入する';
       addLogBtn.className = 'w-full bg-blue-600 hover:bg-blue-500 text-white text-xs py-2 rounded font-semibold transition';
       
-      renderLogs(); // 該当のログ枠を青くハイライト
-      
-      // 入力欄に意識を促すためスクロール＆フォーカス
+      renderLogs();
       document.getElementById('addName').focus();
     }
 
-    // 挿入モードをキャンセル
     function cancelInsertMode() {
       insertTargetIndex = null;
       insertIndicator.classList.add('hidden');
@@ -738,7 +753,6 @@
       renderLogs();
     });
 
-    // 編集モード
     function enterEditMode(pElement, index, log, bodyTextElement) {
       if (currentEditIndex !== null) return; 
       currentEditIndex = index;
@@ -780,7 +794,6 @@
       bodyTextElement.appendChild(editContainer);
     }
 
-    // 発言追加処理
     addLogBtn.addEventListener('click', () => {
       const name = document.getElementById('addName').value.trim();
       const tab = document.getElementById('addTab').value;
@@ -814,15 +827,11 @@
       };
 
       if (insertTargetIndex !== null) {
-        // 選択されたインデックスの「直後」に要素を挿入
         logs.splice(insertTargetIndex + 1, 0, newLog);
-        
-        // 挿入完了後、挿入した新しい位置を選択状態にしておく（連続挿入しやすいように）
         const nextInsertIndex = insertTargetIndex + 1;
         cancelInsertMode();
         setInsertTarget(nextInsertIndex, name);
       } else {
-        // 通常は末尾に追加
         logs.push(newLog);
         renderLogs();
         editorContainer.scrollTop = editorContainer.scrollHeight;
@@ -831,26 +840,18 @@
       document.getElementById('addContent').value = '';
     });
 
-    // 「/」一括削除処理
     document.getElementById('removeSlashBtn').addEventListener('click', () => {
       if (logs.length === 0) {
         alert('ログデータが読み込まれていません。');
         return;
       }
 
-      if (confirm('すべての発言において、文末および「」や』などの閉じ括弧直後にある「/」や「／」を一括で削除します。よろしいですか？\n※空白や改行を挟んでいる場合も対象となります。')) {
+      if (confirm('すべての発言において、文末および「」や』などの閉じ括弧直後にある「/」や「／」を一括で削除します。よろしいですか？')) {
         let count = 0;
         logs.forEach(log => {
           const original = log.content;
-          
-          // 1. 閉じ括弧（」や』）の直後にあるスラッシュ（半角・全角）を削除
-          // 例: 「そうだな」/(行動) ➔ 「そうだな」(行動)
           log.content = log.content.replace(/([」』])[/／]/g, '$1');
-
-          // 2. 発言の最後（文末）にあるスラッシュを削除
-          // 後ろにある空白文字や改行タグ（<br>など）を保持したままスラッシュだけを削る
           log.content = log.content.replace(/[/／](\s*(?:<br\s*\/?>\s*)*)$/i, '$1');
-          
           if (original !== log.content) {
             count++;
           }
@@ -859,6 +860,185 @@
         renderLogs();
         alert(`${count}件の発言から不要な「/」を削除しました。`);
       }
+    });
+
+    // 文字列の一括置換／一括削除
+    executeReplaceBtn.addEventListener('click', () => {
+      if (logs.length === 0) {
+        alert('ログデータが読み込まれていません。');
+        return;
+      }
+
+      const searchStr = replaceSearchInput.value;
+      const replaceWith = replaceWithInput.value;
+
+      if (!searchStr) {
+        alert('検索する文字列を入力してください。');
+        return;
+      }
+
+      const actionText = replaceWith ? `「${replaceWith}」に置換` : '削除';
+      if (!confirm(`全発言中の「${searchStr}」を一括で${actionText}します。よろしいですか？`)) {
+        return;
+      }
+
+      let count = 0;
+      logs.forEach(log => {
+        if (log.content.includes(searchStr)) {
+          log.content = log.content.split(searchStr).join(replaceWith);
+          count++;
+        }
+      });
+
+      renderLogs();
+      alert(`${count}件の発言に含まれる「${searchStr}」を${actionText}しました。`);
+    });
+
+    // ==========================================
+    // ダイス判定ロールの簡略化 (シークレット判定対応)
+    // ==========================================
+    function simplifyDiceRoll(content) {
+      // 不等号パターン（<=, &lt;=, ＜＝, ≦ 等）
+      const lePattern = '(?:<=|&lt;=|＜＝|≦)';
+
+      // コマンド判定:
+      // 先頭の s / S は任意（sCCB, CCB, sCC, SCC, sCBRB, CBRB, sRESB, RESB, s1D100, 1D100 に完全対応）
+      // コマンドと不等号や括弧の間の空白も許容
+      const cmdRegex = new RegExp(
+        `^\\s*(s?(?:ccb|cc|cbrb|resb|1d100))\\s*(?:${lePattern}\\s*([^\\s<【（(「\\[［]+)|[（(]([^)）]+)[)）])?`,
+        'i'
+      );
+
+      // ココフォリアの成否判定ロールの展開部分 (1d100<=目標値) ＞ 出目 ＞ 成否
+      // 全角半角カッコ、全角半角不等号、全角半角「＞ / >」に対応
+      const rollRegex = new RegExp(
+        `[\\(（]1[dD]100\\s*${lePattern}\\s*([^()（）]+)[\\)）]\\s*[＞>]\\s*(.+)$`,
+        's'
+      );
+
+      const cmdMatch = content.match(cmdRegex);
+      const rollMatch = content.match(rollRegex);
+
+      // コマンドと成否ロール展開部の両方が存在しない場合は対象外（単発1d100等は除外）
+      if (!cmdMatch || !rollMatch) return null;
+
+      // コマンド名から先頭の 's' や 'S' を除いて種別を正規化
+      let cmdType = cmdMatch[1].toLowerCase();
+      if (cmdType.startsWith('s')) {
+        cmdType = cmdType.slice(1);
+      }
+
+      const cmdArg = cmdMatch[2] || cmdMatch[3] || '';
+      const rollTarget = rollMatch[1].trim(); // 展開された目標値 (例: 70, 20)
+      const rollResult = rollMatch[2].trim(); // 出目と結果 (例: 95 ＞ 失敗)
+
+      // 目標値の取得 (CBRBで引数がある場合は引数を優先、その他は展開後の目標値)
+      let targetVal = rollTarget;
+      if (cmdType === 'cbrb' && cmdArg) {
+        targetVal = cmdArg.trim();
+      }
+
+      // コマンドと展開部分の間にある付加文章（コメント欄）を取得
+      const afterCmdIndex = cmdMatch[0].length;
+      const beforeRollIndex = content.lastIndexOf(rollMatch[0]);
+
+      let rawComment = '';
+      if (beforeRollIndex >= afterCmdIndex) {
+        rawComment = content.substring(afterCmdIndex, beforeRollIndex);
+      }
+
+      // 余分な改行や空白の整理
+      rawComment = rawComment.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+      // 【】直後の「＞」との間にある不要な空白を除去
+      rawComment = rawComment.replace(/(【.*?】)\s+([＞>])/g, '$1$2');
+
+      // コメント部分のカッコ判定および追記処理
+      let comment = '';
+      if (!rawComment) {
+        // コメント無記入時のデフォルト追記
+        if (cmdType === 'cbrb') comment = '【複合ロール】';
+        else if (cmdType === 'resb') comment = '【対抗】';
+        else comment = '【成功値】';
+      } else {
+        // すでに【】が含まれている場合はそのまま参照
+        if (/【.*?】/.test(rawComment)) {
+          comment = rawComment;
+        } else {
+          // 【】以外の考えられるカッコペア（(),（）,「」,[],［］,≪≫,『』,〈〉,《》,{},｛｝,〔〕等）を【】に変換
+          const bracketRegex = /[（(「\[［≪『〈《{｛〔](.*?)[)）\]］≫』〉》}｝〕]/g;
+          if (bracketRegex.test(rawComment)) {
+            comment = rawComment.replace(bracketRegex, '【$1】');
+          } else {
+            // カッコが一切使われていない場合は全体を【】で囲む
+            comment = `【${rawComment}】`;
+          }
+        }
+      }
+
+      return `${targetVal}${comment} ${rollResult}`;
+    }
+
+    simplifyDiceBtn.addEventListener('click', () => {
+      if (logs.length === 0) {
+        alert('ログデータが読み込まれていません。');
+        return;
+      }
+
+      if (confirm('CCB、CC、CBRB、RESB、1D100（sが付くシークレット判定を含む）の成否判定ダイスロールを一括で簡略化します。よろしいですか？\n※単発ダイスは保持されます。')) {
+        let count = 0;
+        logs.forEach(log => {
+          const simplified = simplifyDiceRoll(log.content);
+          if (simplified !== null && simplified !== log.content) {
+            log.content = simplified;
+            count++;
+          }
+        });
+
+        renderLogs();
+        alert(`${count}件のダイス判定ロール（シークレット判定含む）を簡略化しました。`);
+      }
+    });
+
+    // 指定文字列を含む発言の一括削除 (保護機能付き)
+    executeFilterDeleteBtn.addEventListener('click', () => {
+      if (logs.length === 0) {
+        alert('ログデータが読み込まれていません。');
+        return;
+      }
+
+      const deleteKeyword = filterDeleteInput.value.trim();
+      const protectKeyword = filterProtectInput.value.trim();
+
+      if (!deleteKeyword) {
+        alert('削除対象にする文字列を入力してください。');
+        return;
+      }
+
+      let confirmMsg = `「${deleteKeyword}」を含む発言を一括削除します。`;
+      if (protectKeyword) {
+        confirmMsg += `\n※ただし「${protectKeyword}」を含む発言は保護され、削除されません。`;
+      }
+      confirmMsg += '\nよろしいですか？';
+
+      if (!fastDeleteMode && !confirm(confirmMsg)) {
+        return;
+      }
+
+      const beforeCount = logs.length;
+      logs = logs.filter(log => {
+        if (!log.content.includes(deleteKeyword)) {
+          return true;
+        }
+        if (protectKeyword && log.content.includes(protectKeyword)) {
+          return true;
+        }
+        return false;
+      });
+
+      const deletedCount = beforeCount - logs.length;
+      cancelInsertMode();
+      renderLogs();
+      alert(`${deletedCount}件の発言を削除しました。`);
     });
 
     // ログ出力
@@ -888,7 +1068,6 @@
   </body>
 </html>`;
 
-      // 保存用ファイル名の生成処理（読み込んだファイル名から拡張子を取り除いて _整形.html を付与）
       let exportFileName = 'edited_ccfolia_log.html';
       if (loadedFileName) {
         const baseName = loadedFileName.replace(/\.[^/.]+$/, "");
