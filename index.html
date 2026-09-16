@@ -360,17 +360,42 @@
       renderLogs();
     });
 
+    // ==========================================
+    // ドラッグ＆ドロップ並び替え（非表示タブ保護・パターンA）
+    // ==========================================
     const sortable = new Sortable(logList, {
       handle: '.drag-handle',
       animation: 150,
       ghostClass: 'sortable-ghost',
-      onEnd: function () {
-        const newLogs = [];
-        logList.querySelectorAll('[data-index]').forEach((el) => {
-          const index = parseInt(el.dataset.index, 10);
-          newLogs.push(logs[index]);
-        });
-        logs = newLogs;
+      onEnd: function (evt) {
+        const fromIndex = parseInt(evt.item.dataset.index, 10);
+        const movedLog = logs[fromIndex];
+        if (!movedLog) return;
+
+        // 移動先の直前にある要素を取得
+        const prevEl = evt.item.previousElementSibling;
+        const nextEl = evt.item.nextElementSibling;
+
+        if (prevEl && prevEl.dataset && prevEl.dataset.index !== undefined) {
+          // 直前要素が存在する場合：パターンA（直前要素の直後に差し込む）
+          const prevIndex = parseInt(prevEl.dataset.index, 10);
+          const prevLog = logs[prevIndex];
+
+          // 全体配列から移動要素を抜き出す
+          logs.splice(fromIndex, 1);
+          // 抜き出し後の直前要素の位置を再検索してその直後(+1)に挿入
+          const targetIndex = logs.indexOf(prevLog);
+          logs.splice(targetIndex + 1, 0, movedLog);
+        } else if (nextEl && nextEl.dataset && nextEl.dataset.index !== undefined) {
+          // 先頭に移動された場合：直後要素の直前に差し込む
+          const nextIndex = parseInt(nextEl.dataset.index, 10);
+          const nextLog = logs[nextIndex];
+
+          logs.splice(fromIndex, 1);
+          const targetIndex = logs.indexOf(nextLog);
+          logs.splice(targetIndex, 0, movedLog);
+        }
+
         cancelInsertMode();
         renderLogs(); 
       }
@@ -898,19 +923,13 @@
     // ダイス判定ロールの簡略化 (シークレット判定対応)
     // ==========================================
     function simplifyDiceRoll(content) {
-      // 不等号パターン（<=, &lt;=, ＜＝, ≦ 等）
       const lePattern = '(?:<=|&lt;=|＜＝|≦)';
 
-      // コマンド判定:
-      // 先頭の s / S は任意（sCCB, CCB, sCC, SCC, sCBRB, CBRB, sRESB, RESB, s1D100, 1D100 に完全対応）
-      // コマンドと不等号や括弧の間の空白も許容
       const cmdRegex = new RegExp(
         `^\\s*(s?(?:ccb|cc|cbrb|resb|1d100))\\s*(?:${lePattern}\\s*([^\\s<【（(「\\[［]+)|[（(]([^)）]+)[)）])?`,
         'i'
       );
 
-      // ココフォリアの成否判定ロールの展開部分 (1d100<=目標値) ＞ 出目 ＞ 成否
-      // 全角半角カッコ、全角半角不等号、全角半角「＞ / >」に対応
       const rollRegex = new RegExp(
         `[\\(（]1[dD]100\\s*${lePattern}\\s*([^()（）]+)[\\)）]\\s*[＞>]\\s*(.+)$`,
         's'
@@ -919,26 +938,22 @@
       const cmdMatch = content.match(cmdRegex);
       const rollMatch = content.match(rollRegex);
 
-      // コマンドと成否ロール展開部の両方が存在しない場合は対象外（単発1d100等は除外）
       if (!cmdMatch || !rollMatch) return null;
 
-      // コマンド名から先頭の 's' や 'S' を除いて種別を正規化
       let cmdType = cmdMatch[1].toLowerCase();
       if (cmdType.startsWith('s')) {
         cmdType = cmdType.slice(1);
       }
 
       const cmdArg = cmdMatch[2] || cmdMatch[3] || '';
-      const rollTarget = rollMatch[1].trim(); // 展開された目標値 (例: 70, 20)
-      const rollResult = rollMatch[2].trim(); // 出目と結果 (例: 95 ＞ 失敗)
+      const rollTarget = rollMatch[1].trim();
+      const rollResult = rollMatch[2].trim();
 
-      // 目標値の取得 (CBRBで引数がある場合は引数を優先、その他は展開後の目標値)
       let targetVal = rollTarget;
       if (cmdType === 'cbrb' && cmdArg) {
         targetVal = cmdArg.trim();
       }
 
-      // コマンドと展開部分の間にある付加文章（コメント欄）を取得
       const afterCmdIndex = cmdMatch[0].length;
       const beforeRollIndex = content.lastIndexOf(rollMatch[0]);
 
@@ -947,29 +962,22 @@
         rawComment = content.substring(afterCmdIndex, beforeRollIndex);
       }
 
-      // 余分な改行や空白の整理
       rawComment = rawComment.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
-      // 【】直後の「＞」との間にある不要な空白を除去
       rawComment = rawComment.replace(/(【.*?】)\s+([＞>])/g, '$1$2');
 
-      // コメント部分のカッコ判定および追記処理
       let comment = '';
       if (!rawComment) {
-        // コメント無記入時のデフォルト追記
         if (cmdType === 'cbrb') comment = '【複合ロール】';
         else if (cmdType === 'resb') comment = '【対抗】';
         else comment = '【成功値】';
       } else {
-        // すでに【】が含まれている場合はそのまま参照
         if (/【.*?】/.test(rawComment)) {
           comment = rawComment;
         } else {
-          // 【】以外の考えられるカッコペア（(),（）,「」,[],［］,≪≫,『』,〈〉,《》,{},｛｝,〔〕等）を【】に変換
           const bracketRegex = /[（(「\[［≪『〈《{｛〔](.*?)[)）\]］≫』〉》}｝〕]/g;
           if (bracketRegex.test(rawComment)) {
             comment = rawComment.replace(bracketRegex, '【$1】');
           } else {
-            // カッコが一切使われていない場合は全体を【】で囲む
             comment = `【${rawComment}】`;
           }
         }
